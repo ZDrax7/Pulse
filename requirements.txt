@@ -1,4 +1,2 @@
 streamlit
 edge-tts
-requests
-
