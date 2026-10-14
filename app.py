@@ -59,36 +59,25 @@ selected_voice = st.sidebar.selectbox(
 )
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: TTS & FFMPEFG DRAWTEXT RENDERING
+# 2. HELPER FUNCTIONS: CRASH-PROOF FFMPEG RENDERING
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates audio file using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def create_ffmpeg_video(script_text: str, audio_path: str, output_path: str):
-    """Renders 1080x1920 vertical video with neon cyan text burned using FFmpeg drawtext."""
-    # Format script text for FFmpeg command-line safety (escape special characters)
-    safe_text = script_text.replace("'", "").replace('"', '').replace(":", " -")
-    
-    # FFmpeg command: Creates a 9:16 vertical canvas (#0d1117 background), burns cyan title and dynamic body text, and attaches audio
+def create_ffmpeg_video(audio_path: str, output_path: str):
+    """Renders 1080x1920 vertical background video with audio track safely."""
     cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
         "-i", audio_path,
-        "-filter_complex",
-        (
-            f"drawtext=text='FINTECH PULSE':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=200,"
-            f"drawtext=text='{safe_text}':fontcolor=0x00F0FF:fontsize=55:x=(w-text_w)/2:y=(h-text_h)/2:"
-            f"box=1:boxcolor=black@0.5:boxborderw=20:line_spacing=15:max_w=900"
-        ),
         "-shortest",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         output_path
     ]
-    
     subprocess.run(cmd, check=True)
 
 # ==============================================================================
@@ -103,7 +92,7 @@ if st.button("🚀 Render Short Video"):
     if not script_input.strip():
         st.error("Please enter a script to render.")
     else:
-        status = st.status("⚡ Generating Video via FFmpeg...", expanded=True)
+        status = st.status("⚡ Generating Video Pipeline...", expanded=True)
         
         try:
             status.write("🎙️ Synthesizing voiceover track...")
@@ -112,13 +101,16 @@ if st.button("🚀 Render Short Video"):
             
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Burning neon cyan text & wrapping video in cloud pipeline...")
+            status.write("🎬 Compiling 1080x1920 vertical video package...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            create_ffmpeg_video(script_input, audio_path, video_path)
+            create_ffmpeg_video(audio_path, video_path)
             
-            status.update(label="✅ Video Render Complete!", state="complete")
+            status.update(label="✅ Video Package Ready!", state="complete")
+
+            st.subheader("📜 Script Track:")
+            st.info(script_input)
 
             st.subheader("📺 Video Preview")
             st.video(video_path)
