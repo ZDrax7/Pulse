@@ -1,13 +1,9 @@
 import os
 import asyncio
 import tempfile
+import subprocess
 import streamlit as st
 import edge_tts
-from moviepy.editor import (
-    ColorClip,
-    CompositeVideoClip,
-    AudioFileClip
-)
 
 # ==============================================================================
 # 1. STREAMLIT APP CONFIGURATION & BRANDING
@@ -61,39 +57,39 @@ selected_voice = st.sidebar.selectbox(
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
     index=0
 )
-bg_color_hex = st.sidebar.color_picker("Background Color", "#0d1117")
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: TTS & VIDEO GENERATION (IMAGE-MAGICK FREE)
+# 2. HELPER FUNCTIONS: TTS & FFMPEFG DRAWTEXT RENDERING
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates audio file using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def create_short_video(script_text: str, audio_path: str, output_path: str):
-    """Renders a 1080x1920 vertical video using safe color clips (no ImageMagick required)."""
-    audio_clip = AudioFileClip(audio_path)
-    duration = audio_clip.duration
+def create_ffmpeg_video(script_text: str, audio_path: str, output_path: str):
+    """Renders 1080x1920 vertical video with neon cyan text burned using FFmpeg drawtext."""
+    # Format script text for FFmpeg command-line safety (escape special characters)
+    safe_text = script_text.replace("'", "").replace('"', '').replace(":", " -")
     
-    # Background Canvas (1080x1920 Vertical format)
-    bg_clip = ColorClip(size=(1080, 1920), color=[13, 17, 23], duration=duration)
+    # FFmpeg command: Creates a 9:16 vertical canvas (#0d1117 background), burns cyan title and dynamic body text, and attaches audio
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
+        "-i", audio_path,
+        "-filter_complex",
+        (
+            f"drawtext=text='FINTECH PULSE':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=200,"
+            f"drawtext=text='{safe_text}':fontcolor=0x00F0FF:fontsize=55:x=(w-text_w)/2:y=(h-text_h)/2:"
+            f"box=1:boxcolor=black@0.5:boxborderw=20:line_spacing=15:max_w=900"
+        ),
+        "-shortest",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        output_path
+    ]
     
-    # Composite & Render Output safely without TextClips
-    final_clip = CompositeVideoClip([bg_clip])
-    final_clip = final_clip.set_audio(audio_clip)
-    
-    final_clip.write_videofile(
-        output_path, 
-        fps=24, 
-        codec='libx264', 
-        audio_codec='aac',
-        preset='ultrafast',
-        threads=4
-    )
-    
-    audio_clip.close()
-    final_clip.close()
+    subprocess.run(cmd, check=True)
 
 # ==============================================================================
 # 3. MAIN APPLICATION CONTROLLER
@@ -107,7 +103,7 @@ if st.button("🚀 Render Short Video"):
     if not script_input.strip():
         st.error("Please enter a script to render.")
     else:
-        status = st.status("⚡ Generating Free Video...", expanded=True)
+        status = st.status("⚡ Generating Video via FFmpeg...", expanded=True)
         
         try:
             status.write("🎙️ Synthesizing voiceover track...")
@@ -116,16 +112,13 @@ if st.button("🚀 Render Short Video"):
             
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Rendering 1080x1920 vertical video background & audio track...")
+            status.write("🎬 Burning neon cyan text & wrapping video in cloud pipeline...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            create_short_video(script_input, audio_path, video_path)
+            create_ffmpeg_video(script_input, audio_path, video_path)
             
             status.update(label="✅ Video Render Complete!", state="complete")
-
-            st.subheader("📜 Script Track:")
-            st.info(script_input)
 
             st.subheader("📺 Video Preview")
             st.video(video_path)
