@@ -1,10 +1,8 @@
 import os
-import json
 import asyncio
 import tempfile
 import streamlit as st
 import edge_tts
-from openai import OpenAI
 from moviepy.editor import (
     TextClip,
     ColorClip,
@@ -57,11 +55,10 @@ st.markdown("""
 
 # App Header
 st.markdown("<h1 class='main-title'>⚡ FINTECH PULSE</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-title'>Automated High-RPM Short Video Engine</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>Free Automated High-RPM Short Video Engine</p>", unsafe_allow_html=True)
 
-# Sidebar Configuration
+# Sidebar Configuration (No API Key Required!)
 st.sidebar.header("⚙️ Pipeline Setup")
-api_key = st.sidebar.text_input("OpenAI / OpenRouter API Key", type="password")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
@@ -96,7 +93,6 @@ def create_short_video(script_text: str, audio_path: str, output_path: str, bg_h
     for idx, chunk in enumerate(chunks):
         start_t = idx * chunk_duration
         
-        # Main Caption Clip
         txt_clip = (TextClip(
                         chunk.upper(), 
                         fontsize=65, 
@@ -133,59 +129,41 @@ def create_short_video(script_text: str, audio_path: str, output_path: str, bg_h
         threads=4
     )
     
-    # Cleanup memory
     audio_clip.close()
     final_clip.close()
 
 # ==============================================================================
-# 3. MAIN APPLICATION CONTROLLER
+# 3. MAIN APPLICATION CONTROLLER (KEYLESS & FREE)
 # ==============================================================================
-topic = st.text_input("💡 Enter Video Topic:", "3 AI tools that feel illegal for personal finance in 2026")
+script_input = st.text_area(
+    "💡 Enter or Paste Your Video Script:", 
+    "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger. Link in bio to start."
+)
 
 if st.button("🚀 Render Short Video"):
-    if not api_key:
-        st.error("Please provide an OpenAI or OpenRouter API key in the sidebar.")
+    if not script_input.strip():
+        st.error("Please enter a script to render.")
     else:
-        status = st.status("⚡ Generating Video...", expanded=True)
+        status = st.status("⚡ Generating Free Video...", expanded=True)
         
         try:
-            # Step 1: Script Generation via LLM
-            status.write("🧠 Writing high-retention Fintech script...")
-            client = OpenAI(api_key=api_key)
-            prompt = f"""
-            Write a punchy, engaging 30-second YouTube Short script about: '{topic}'.
-            Requirements:
-            - Target: Wealth & Fintech audience.
-            - Start with a massive hook in the first 3 seconds.
-            - Keep word count under 75 words total.
-            - No stage directions or brackets—return ONLY the raw text to be spoken.
-            """
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            script = response.choices[0].message.content.strip()
-            
-            st.subheader("📜 Generated Script:")
-            st.info(script)
-
-            # Step 2: Voiceover Synthesis
-            status.write("🎙️ Synthesizing voiceover track (Free TTS)...")
+            # Step 1: Voiceover Synthesis (Free Edge-TTS)
+            status.write("🎙️ Synthesizing voiceover track...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
                 audio_path = tmp_audio.name
             
-            asyncio.run(generate_speech(script, selected_voice, audio_path))
+            asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            # Step 3: Video Assembly & Rendering
-            status.write("🎬 Rendering 1080x1920 vertical video & burning captions...")
+            # Step 2: Video Assembly & Rendering
+            status.write("🎬 Rendering 1080x1920 vertical video & burning neon captions...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            create_short_video(script, audio_path, video_path, bg_color_hex)
+            create_short_video(script_input, audio_path, video_path, bg_color_hex)
             
             status.update(label="✅ Video Render Complete!", state="complete")
 
-            # Step 4: Preview & Download
+            # Step 3: Preview & Download
             st.subheader("📺 Video Preview")
             st.video(video_path)
             
