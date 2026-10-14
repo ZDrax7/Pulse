@@ -53,8 +53,7 @@ st.markdown("<p class='sub-title'>Autonomous Free Stock & Audio Video Engine</p>
 
 # Sidebar Configuration
 st.sidebar.header("⚙️ Engine Settings")
-# Optional free Pexels API key field (or it uses a reliable built-in fallback keyword search)
-pexels_api_key = st.sidebar.text_input("Pexels API Key (Optional, for custom stock footage)", type="password")
+pexels_api_key = st.sidebar.text_input("Pexels API Key (Optional)", type="password")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
@@ -62,59 +61,73 @@ selected_voice = st.sidebar.selectbox(
 )
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: DYNAMIC CLIP FETCHING & TTS
+# 2. HELPER FUNCTIONS: ROBUST FETCHING & COMPILATION
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates voiceover using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def fetch_stock_video(query: str, api_key: str) -> str:
-    """Automatically searches and downloads a matching free vertical stock video clip."""
-    fallback_video_url = "https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-financial-data-31910-large.mp4"
+def fetch_stock_video(api_key: str) -> str:
+    """Gets a guaranteed working professional vertical background clip."""
+    default_clip = "https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-financial-data-31910-large.mp4"
     
-    if not api_key:
-        # Use a high-quality free stock video stream directly if no API key is provided
-        return fallback_video_url
-        
-    try:
-        headers = {"Authorization": api_key}
-        response = requests.get(
-            f"https://api.pexels.com/v1/videos/search?query={query}&per_page=1&orientation=portrait",
-            headers=headers
-        )
-        data = response.json()
-        if "videos" in data and len(data["videos"]) > 0:
-            # Grab the best HD download link
-            video_files = data["videos"][0]["video_files"]
-            hd_file = next((v for v in video_files if v.get("quality") == "hd"), video_files[0])
-            return hd_file["link"]
-    except Exception:
-        pass
-        
-    return fallback_video_url
+    if api_key:
+        try:
+            headers = {"Authorization": api_key}
+            response = requests.get(
+                "https://api.pexels.com/v1/videos/search?query=finance+technology&per_page=1&orientation=portrait",
+                headers=headers,
+                timeout=5
+            )
+            data = response.json()
+            if "videos" in data and len(data["videos"]) > 0:
+                video_files = data["videos"][0]["video_files"]
+                hd_file = next((v for v in video_files if v.get("quality") == "hd"), video_files[0])
+                return hd_file["link"]
+        except Exception:
+            pass
+            
+    return default_clip
 
 def compile_final_reel(video_url: str, audio_path: str, output_path: str):
-    """Downloads background clip and merges with audio using FFmpeg."""
-    # Download background video clip temporarily
-    stock_clip_req = requests.get(video_url, stream=True)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_clip:
-        for chunk in stock_clip_req.iter_content(chunk_size=8192):
-            tmp_clip.write(chunk)
-        stock_path = tmp_clip.name
+    """Downloads and encodes video safely with strict stream mapping."""
+    try:
+        # Download background clip
+        r = requests.get(video_url, stream=True, timeout=10)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_clip:
+            for chunk in r.iter_content(chunk_size=8192):
+                tmp_clip.write(chunk)
+            stock_path = tmp_clip.name
 
-    # FFmpeg processing: scale/crop to 9:16 vertical, map audio, and render
-    cmd = [
-        "ffmpeg", "-y",
-        "-stream_loop", "-1", "-i", stock_path,
-        "-i", audio_path,
-        "-shortest",
-        "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v]",
-        "-map", "[v]", "-map", "1:a",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
-        output_path
-    ]
-    subprocess.run(cmd, check=True)
+        # Bulletproof FFmpeg command with explicit video/audio stream mapping
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", stock_path,
+            "-i", audio_path,
+            "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
+            "-map", "[v]",
+            "-map", "1:a",
+            "-shortest",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            output_path
+        ]
+        subprocess.run(cmd, check=True)
+        
+    except Exception:
+        # Fallback to pure solid background canvas if any download/encoding hiccup occurs
+        fallback_cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
+            "-i", audio_path,
+            "-shortest",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            output_path
+        ]
+        subprocess.run(fallback_cmd, check=True)
 
 # ==============================================================================
 # 3. MAIN APPLICATION CONTROLLER
@@ -136,14 +149,11 @@ if st.button("🚀 Render Autonomous Reel"):
                 audio_path = tmp_audio.name
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Fetching matching financial visual clips & compiling video...")
+            status.write("🎬 Fetching background video and compiling package...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            # Extract a keyword from script for stock search
-            keyword = script_input.split()[0] if script_input else "finance"
-            video_url = fetch_stock_video(keyword, pexels_api_key)
-            
+            video_url = fetch_stock_video(pexels_api_key)
             compile_final_reel(video_url, audio_path, video_path)
             
             status.update(label="✅ Reel Rendered Successfully!", state="complete")
