@@ -48,32 +48,43 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='main-title'>⚡ FINTECH PULSE</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-title'>Autonomous Programmatic Visual & Audio Engine</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>High-RPM Viral Short Video Monetization Engine</p>", unsafe_allow_html=True)
 
-# Sidebar Configuration
-st.sidebar.header("⚙️ Engine Settings")
+# Sidebar Configuration for Monetization/Branding hooks
+st.sidebar.header("⚙️ Channel Settings")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
     index=0
 )
+cta_text = st.sidebar.text_input("Call to Action (Watermark)", "LINK IN BIO TO START")
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: PROGRAMMATIC VISUAL GENERATION & TTS
+# 2. HELPER FUNCTIONS: AUDIO & HIGH-RETENTION RENDERER
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates voiceover using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def compile_dynamic_visual_reel(audio_path: str, output_path: str):
-    """Generates a high-tech animated visual background using FFmpeg native filters (no external downloads needed)."""
-    # Creates an animated test source with moving color patterns (generating dynamic visual elements on the fly) + overlays audio
+def compile_viral_short(script_text: str, cta: str, audio_path: str, output_path: str):
+    """Renders high-retention 1080x1920 vertical short with gradient background and professional text burns."""
+    safe_text = script_text.replace("'", "").replace('"', '').replace(":", " -")
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    
+    # FFmpeg pipeline: generates dynamic dark wave background, burns white/cyan hook texts, and overlays CTA at the bottom
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "testsrc2=size=1080x1920:rate=24",
+        "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
         "-i", audio_path,
-        "-filter_complex", "[0:v]eq=contrast=1.5:brightness=0.1,hue=h=t*20[v]",
+        "-filter_complex", 
+        (
+            "[0:v]geq=r='13+10*sin(X/200+T)':g='17+15*sin(Y/200+T)':b='23+20*cos((X+Y)/250+T)'[bg];"
+            f"[bg]drawtext=fontfile={font_path}:text='FINTECH PULSE':fontcolor=0x00F0FF:fontsize=45:x=(w-text_w)/2:y=180,"
+            f"[bg]drawtext=fontfile={font_path}:text='{safe_text}':fontcolor=white:fontsize=52:x=(w-text_w)/2:y=(h-text_h)/2:"
+            f"box=1:boxcolor=black@0.7:boxborderw=30:line_spacing=20:max_w=900,"
+            f"drawtext=fontfile={font_path}:text='{cta}':fontcolor=0x00F0FF:fontsize=40:x=(w-text_w)/2:y=h-250[v]"
+        ),
         "-map", "[v]",
         "-map", "1:a",
         "-shortest",
@@ -89,38 +100,38 @@ def compile_dynamic_visual_reel(audio_path: str, output_path: str):
 # 3. MAIN APPLICATION CONTROLLER
 # ==============================================================================
 script_input = st.text_area(
-    "💡 Enter or Paste Your Video Script / Topic:", 
-    "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger. Link in bio to start."
+    "💡 Enter Viral Hook Script:", 
+    "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger."
 )
 
-if st.button("🚀 Render Autonomous Reel"):
+if st.button("🚀 Render Monetization Short"):
     if not script_input.strip():
-        st.error("Please enter a script or topic.")
+        st.error("Please enter a script.")
     else:
-        status = st.status("⚡ Generating Programmatic Reel...", expanded=True)
+        status = st.status("⚡ Compiling Viral Short...", expanded=True)
         
         try:
-            status.write("🎙️ Synthesizing professional voiceover track...")
+            status.write("🎙️ Synthesizing high-retention voiceover...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
                 audio_path = tmp_audio.name
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Rendering dynamic visual background patterns & merging audio...")
+            status.write("🎬 Burning kinetic typography & branding...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            compile_dynamic_visual_reel(audio_path, video_path)
+            compile_viral_short(script_input, cta_text, audio_path, video_path)
             
-            status.update(label="✅ Reel Rendered Successfully!", state="complete")
+            status.update(label="✅ Viral Short Ready!", state="complete")
 
-            st.subheader("📺 Reel Preview")
+            st.subheader("📺 Short Preview")
             st.video(video_path)
             
             with open(video_path, "rb") as file:
                 st.download_button(
-                    label="📥 Download Ready Reel (.mp4)",
+                    label="📥 Download Ready Short (.mp4)",
                     data=file,
-                    file_name="fintech_pulse_reel.mp4",
+                    file_name="fintech_pulse_monetization_short.mp4",
                     mime="video/mp4"
                 )
 
