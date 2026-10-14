@@ -2,9 +2,9 @@ import os
 import asyncio
 import tempfile
 import requests
+import subprocess
 import streamlit as st
 import edge_tts
-import replicate
 
 # ==============================================================================
 # 1. STREAMLIT APP CONFIGURATION & BRANDING
@@ -49,11 +49,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='main-title'>⚡ FINTECH PULSE</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-title'>AI Visual Viral Short Video Generator</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>Autonomous Free Stock & Audio Video Engine</p>", unsafe_allow_html=True)
 
-# Sidebar Configuration for AI Keys
-st.sidebar.header("⚙️ Cloud API Setup")
-replicate_api_key = st.sidebar.text_input("Replicate API Key (for AI Video Generation)", type="password")
+# Sidebar Configuration
+st.sidebar.header("⚙️ Engine Settings")
+# Optional free Pexels API key field (or it uses a reliable built-in fallback keyword search)
+pexels_api_key = st.sidebar.text_input("Pexels API Key (Optional, for custom stock footage)", type="password")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
@@ -61,80 +62,103 @@ selected_voice = st.sidebar.selectbox(
 )
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: AI VIDEO & AUDIO SYNTHESIS
+# 2. HELPER FUNCTIONS: DYNAMIC CLIP FETCHING & TTS
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
-    """Generates audio file using Microsoft's Free Edge-TTS engine."""
+    """Generates voiceover using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def generate_ai_visual_video(topic: str, api_key: str) -> str:
-    """Calls an AI video model on Replicate to create a viral visual background video."""
-    os.environ["REPLICATE_API_TOKEN"] = api_key
+def fetch_stock_video(query: str, api_key: str) -> str:
+    """Automatically searches and downloads a matching free vertical stock video clip."""
+    fallback_video_url = "https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-financial-data-31910-large.mp4"
     
-    # Prompt optimized for high-retention viral aesthetic
-    prompt = f"Vertical 9:16 cinematic stock footage background visualizing: {topic}, futuristic tech aesthetic, glowing neon cyan lights, high-end wealth dashboard, 4k resolution, smooth motion."
-    
-    # Using a fast, high-quality video generation model via Replicate
-    output = replicate.run(
-        "minimax/video-01",
-        input={
-            "prompt": prompt,
-            "prompt_optimizer": True
-        }
-    )
-    
-    # Download the generated video file from the cloud URL
-    video_url = str(output)
-    response = requests.get(video_url)
-    
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    tmp_file.write(response.content)
-    tmp_file.close()
-    return tmp_file.name
+    if not api_key:
+        # Use a high-quality free stock video stream directly if no API key is provided
+        return fallback_video_url
+        
+    try:
+        headers = {"Authorization": api_key}
+        response = requests.get(
+            f"https://api.pexels.com/v1/videos/search?query={query}&per_page=1&orientation=portrait",
+            headers=headers
+        )
+        data = response.json()
+        if "videos" in data and len(data["videos"]) > 0:
+            # Grab the best HD download link
+            video_files = data["videos"][0]["video_files"]
+            hd_file = next((v for v in video_files if v.get("quality") == "hd"), video_files[0])
+            return hd_file["link"]
+    except Exception:
+        pass
+        
+    return fallback_video_url
+
+def compile_final_reel(video_url: str, audio_path: str, output_path: str):
+    """Downloads background clip and merges with audio using FFmpeg."""
+    # Download background video clip temporarily
+    stock_clip_req = requests.get(video_url, stream=True)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_clip:
+        for chunk in stock_clip_req.iter_content(chunk_size=8192):
+            tmp_clip.write(chunk)
+        stock_path = tmp_clip.name
+
+    # FFmpeg processing: scale/crop to 9:16 vertical, map audio, and render
+    cmd = [
+        "ffmpeg", "-y",
+        "-stream_loop", "-1", "-i", stock_path,
+        "-i", audio_path,
+        "-shortest",
+        "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v]",
+        "-map", "[v]", "-map", "1:a",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+        output_path
+    ]
+    subprocess.run(cmd, check=True)
 
 # ==============================================================================
 # 3. MAIN APPLICATION CONTROLLER
 # ==============================================================================
-topic_input = st.text_input(
-    "💡 Enter Video Topic / Concept:", 
-    "Top 3 AI financial tracking tools automating wealth in 2026"
+script_input = st.text_area(
+    "💡 Enter or Paste Your Video Script / Topic:", 
+    "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger. Link in bio to start."
 )
 
-if st.button("🚀 Generate AI Visual Short"):
-    if not replicate_api_key:
-        st.error("Please provide your Replicate API key in the sidebar to generate AI visuals.")
-    elif not topic_input.strip():
-        st.error("Please enter a video topic.")
+if st.button("🚀 Render Autonomous Reel"):
+    if not script_input.strip():
+        st.error("Please enter a script or topic.")
     else:
-        status = st.status("⚡ Generating AI Visual Video...", expanded=True)
+        status = st.status("⚡ Generating Automated Reel...", expanded=True)
         
         try:
-            # Step 1: Generate AI Visual Background
-            status.write("🧠 AI is visualizing and rendering cinematic background scenes...")
-            ai_video_path = generate_ai_visual_video(topic_input, replicate_api_key)
-
-            # Step 2: Generate Voiceover
-            status.write("🎙️ Synthesizing high-retention voiceover track...")
-            script_text = f"Stop scrolling. Here is everything you need to know about {topic_input}. Link in bio to start."
+            status.write("🎙️ Synthesizing professional voiceover track...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
                 audio_path = tmp_audio.name
-            
-            asyncio.run(generate_speech(script_text, selected_voice, audio_path))
-            
-            status.update(label="✅ AI Viral Video Ready!", state="complete")
+            asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            st.subheader("📺 AI Visual Preview")
-            st.video(ai_video_path)
+            status.write("🎬 Fetching matching financial visual clips & compiling video...")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
+                video_path = tmp_video.name
+                
+            # Extract a keyword from script for stock search
+            keyword = script_input.split()[0] if script_input else "finance"
+            video_url = fetch_stock_video(keyword, pexels_api_key)
             
-            with open(ai_video_path, "rb") as file:
+            compile_final_reel(video_url, audio_path, video_path)
+            
+            status.update(label="✅ Reel Rendered Successfully!", state="complete")
+
+            st.subheader("📺 Reel Preview")
+            st.video(video_path)
+            
+            with open(video_path, "rb") as file:
                 st.download_button(
-                    label="📥 Download Viral AI Short (.mp4)",
+                    label="📥 Download Ready Reel (.mp4)",
                     data=file,
-                    file_name="fintech_pulse_viral_ai.mp4",
+                    file_name="fintech_pulse_reel.mp4",
                     mime="video/mp4"
                 )
 
         except Exception as e:
-            status.update(label="❌ Error generating AI video", state="error")
+            status.update(label="❌ Error generating video", state="error")
             st.error(f"Error details: {e}")
