@@ -103,7 +103,7 @@ script_input = st.text_area(
     "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger."
 )
 
-if st.button("🚀 Render Monetization Short"):
+if st.button("🚀 Render the fucking Short"):
     if not script_input.strip():
         st.error("Please enter a script.")
     else:
