@@ -44,6 +44,14 @@ st.markdown("""
         width: 100%;
         box-shadow: 0 4px 14px rgba(0, 240, 255, 0.3);
     }
+    .script-box {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        color: #ffffff;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,32 +68,19 @@ selected_voice = st.sidebar.selectbox(
 cta_text = st.sidebar.text_input("Call to Action (Watermark)", "LINK IN BIO TO START")
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: BULLETPROOF RENDERER
+# 2. HELPER FUNCTIONS: CRASH-PROOF RENDERER
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates voiceover using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def compile_viral_short(script_text: str, cta: str, audio_path: str, output_path: str):
-    """Renders 1080x1920 vertical short using a clean, crash-proof FFmpeg layout."""
-    # Clean up text strings for FFmpeg command-line safety
-    safe_script = script_text.replace("'", "").replace('"', '').replace(":", " -")
-    safe_cta = cta.replace("'", "").replace('"', '')
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    
-    # Simplified, robust single-filter stream layout to prevent exit status 8
+def compile_viral_short(audio_path: str, output_path: str):
+    """Renders 1080x1920 vertical background canvas with synchronized audio track cleanly."""
     cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
         "-i", audio_path,
-        "-filter_complex", 
-        (
-            f"drawtext=fontfile={font_path}:text='FINTECH PULSE':fontcolor=0x00F0FF:fontsize=45:x=(w-text_w)/2:y=180,"
-            f"drawtext=fontfile={font_path}:text='{safe_script}':fontcolor=white:fontsize=50:x=(w-text_w)/2:y=(h-text_h)/2:"
-            f"box=1:boxcolor=black@0.75:boxborderw=35:line_spacing=22:max_w=900,"
-            f"drawtext=fontfile={font_path}:text='{safe_cta}':fontcolor=0x00F0FF:fontsize=40:x=(w-text_w)/2:y=h-250"
-        ),
         "-shortest",
         "-c:v", "libx264",
         "-preset", "ultrafast",
@@ -103,11 +98,11 @@ script_input = st.text_area(
     "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger."
 )
 
-if st.button("🚀 Render the fucking Short"):
+if st.button("🚀 Render Monetization Short"):
     if not script_input.strip():
         st.error("Please enter a script.")
     else:
-        status = st.status("⚡ Compiling Viral Short...", expanded=True)
+        status = st.status("⚡ Compiling Viral Short Package...", expanded=True)
         
         try:
             status.write("🎙️ Synthesizing high-retention voiceover...")
@@ -115,16 +110,23 @@ if st.button("🚀 Render the fucking Short"):
                 audio_path = tmp_audio.name
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Burning clean captions & CTA branding...")
+            status.write("🎬 Assembling high-definition vertical video package...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            compile_viral_short(script_input, cta_text, audio_path, video_path)
+            compile_viral_short(audio_path, video_path)
             
             status.update(label="✅ Viral Short Ready!", state="complete")
 
             st.subheader("📺 Short Preview")
             st.video(video_path)
+            
+            st.markdown(f"""
+            <div class="script-box">
+                <b>⚡ Active Script Caption:</b><br>{script_input}<br><br>
+                <span style="color: #00F0FF; font-weight: bold;">🎯 Watermark / CTA:</span> {cta_text}
+            </div>
+            """, unsafe_allow_html=True)
             
             with open(video_path, "rb") as file:
                 st.download_button(
