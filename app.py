@@ -1,7 +1,6 @@
 import os
 import asyncio
 import tempfile
-import requests
 import subprocess
 import streamlit as st
 import edge_tts
@@ -49,11 +48,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='main-title'>⚡ FINTECH PULSE</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-title'>Autonomous Free Stock & Audio Video Engine</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>Autonomous Programmatic Visual & Audio Engine</p>", unsafe_allow_html=True)
 
 # Sidebar Configuration
 st.sidebar.header("⚙️ Engine Settings")
-pexels_api_key = st.sidebar.text_input("Pexels API Key (Optional)", type="password")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
@@ -61,73 +59,31 @@ selected_voice = st.sidebar.selectbox(
 )
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: ROBUST FETCHING & COMPILATION
+# 2. HELPER FUNCTIONS: PROGRAMMATIC VISUAL GENERATION & TTS
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates voiceover using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def fetch_stock_video(api_key: str) -> str:
-    """Gets a guaranteed working professional vertical background clip."""
-    default_clip = "https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-financial-data-31910-large.mp4"
-    
-    if api_key:
-        try:
-            headers = {"Authorization": api_key}
-            response = requests.get(
-                "https://api.pexels.com/v1/videos/search?query=finance+technology&per_page=1&orientation=portrait",
-                headers=headers,
-                timeout=5
-            )
-            data = response.json()
-            if "videos" in data and len(data["videos"]) > 0:
-                video_files = data["videos"][0]["video_files"]
-                hd_file = next((v for v in video_files if v.get("quality") == "hd"), video_files[0])
-                return hd_file["link"]
-        except Exception:
-            pass
-            
-    return default_clip
-
-def compile_final_reel(video_url: str, audio_path: str, output_path: str):
-    """Downloads and encodes video safely with strict stream mapping."""
-    try:
-        # Download background clip
-        r = requests.get(video_url, stream=True, timeout=10)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_clip:
-            for chunk in r.iter_content(chunk_size=8192):
-                tmp_clip.write(chunk)
-            stock_path = tmp_clip.name
-
-        # Bulletproof FFmpeg command with explicit video/audio stream mapping
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", stock_path,
-            "-i", audio_path,
-            "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
-            "-map", "[v]",
-            "-map", "1:a",
-            "-shortest",
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            output_path
-        ]
-        subprocess.run(cmd, check=True)
-        
-    except Exception:
-        # Fallback to pure solid background canvas if any download/encoding hiccup occurs
-        fallback_cmd = [
-            "ffmpeg", "-y",
-            "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
-            "-i", audio_path,
-            "-shortest",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
-            output_path
-        ]
-        subprocess.run(fallback_cmd, check=True)
+def compile_dynamic_visual_reel(audio_path: str, output_path: str):
+    """Generates a high-tech animated visual background using FFmpeg native filters (no external downloads needed)."""
+    # Creates an animated test source with moving color patterns (generating dynamic visual elements on the fly) + overlays audio
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", "testsrc2=size=1080x1920:rate=24",
+        "-i", audio_path,
+        "-filter_complex", "[0:v]eq=contrast=1.5:brightness=0.1,hue=h=t*20[v]",
+        "-map", "[v]",
+        "-map", "1:a",
+        "-shortest",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        output_path
+    ]
+    subprocess.run(cmd, check=True)
 
 # ==============================================================================
 # 3. MAIN APPLICATION CONTROLLER
@@ -141,7 +97,7 @@ if st.button("🚀 Render Autonomous Reel"):
     if not script_input.strip():
         st.error("Please enter a script or topic.")
     else:
-        status = st.status("⚡ Generating Automated Reel...", expanded=True)
+        status = st.status("⚡ Generating Programmatic Reel...", expanded=True)
         
         try:
             status.write("🎙️ Synthesizing professional voiceover track...")
@@ -149,12 +105,11 @@ if st.button("🚀 Render Autonomous Reel"):
                 audio_path = tmp_audio.name
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Fetching background video and compiling package...")
+            status.write("🎬 Rendering dynamic visual background patterns & merging audio...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
-            video_url = fetch_stock_video(pexels_api_key)
-            compile_final_reel(video_url, audio_path, video_path)
+            compile_dynamic_visual_reel(audio_path, video_path)
             
             status.update(label="✅ Reel Rendered Successfully!", state="complete")
 
