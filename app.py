@@ -50,7 +50,7 @@ st.markdown("""
 st.markdown("<h1 class='main-title'>⚡ FINTECH PULSE</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>High-RPM Viral Short Video Monetization Engine</p>", unsafe_allow_html=True)
 
-# Sidebar Configuration for Monetization/Branding hooks
+# Sidebar Configuration
 st.sidebar.header("⚙️ Channel Settings")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
@@ -60,7 +60,7 @@ selected_voice = st.sidebar.selectbox(
 cta_text = st.sidebar.text_input("Call to Action (Watermark)", "LINK IN BIO TO START")
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: AUDIO & HIGH-RETENTION RENDERER
+# 2. HELPER FUNCTIONS: BULLETPROOF RENDERER
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates voiceover using Microsoft's Free Edge-TTS engine."""
@@ -68,25 +68,24 @@ async def generate_speech(text: str, voice: str, output_file: str):
     await communicate.save(output_file)
 
 def compile_viral_short(script_text: str, cta: str, audio_path: str, output_path: str):
-    """Renders high-retention 1080x1920 vertical short with gradient background and professional text burns."""
-    safe_text = script_text.replace("'", "").replace('"', '').replace(":", " -")
+    """Renders 1080x1920 vertical short using a clean, crash-proof FFmpeg layout."""
+    # Clean up text strings for FFmpeg command-line safety
+    safe_script = script_text.replace("'", "").replace('"', '').replace(":", " -")
+    safe_cta = cta.replace("'", "").replace('"', '')
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     
-    # FFmpeg pipeline: generates dynamic dark wave background, burns white/cyan hook texts, and overlays CTA at the bottom
+    # Simplified, robust single-filter stream layout to prevent exit status 8
     cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
         "-i", audio_path,
         "-filter_complex", 
         (
-            "[0:v]geq=r='13+10*sin(X/200+T)':g='17+15*sin(Y/200+T)':b='23+20*cos((X+Y)/250+T)'[bg];"
-            f"[bg]drawtext=fontfile={font_path}:text='FINTECH PULSE':fontcolor=0x00F0FF:fontsize=45:x=(w-text_w)/2:y=180,"
-            f"[bg]drawtext=fontfile={font_path}:text='{safe_text}':fontcolor=white:fontsize=52:x=(w-text_w)/2:y=(h-text_h)/2:"
-            f"box=1:boxcolor=black@0.7:boxborderw=30:line_spacing=20:max_w=900,"
-            f"drawtext=fontfile={font_path}:text='{cta}':fontcolor=0x00F0FF:fontsize=40:x=(w-text_w)/2:y=h-250[v]"
+            f"drawtext=fontfile={font_path}:text='FINTECH PULSE':fontcolor=0x00F0FF:fontsize=45:x=(w-text_w)/2:y=180,"
+            f"drawtext=fontfile={font_path}:text='{safe_script}':fontcolor=white:fontsize=50:x=(w-text_w)/2:y=(h-text_h)/2:"
+            f"box=1:boxcolor=black@0.75:boxborderw=35:line_spacing=22:max_w=900,"
+            f"drawtext=fontfile={font_path}:text='{safe_cta}':fontcolor=0x00F0FF:fontsize=40:x=(w-text_w)/2:y=h-250"
         ),
-        "-map", "[v]",
-        "-map", "1:a",
         "-shortest",
         "-c:v", "libx264",
         "-preset", "ultrafast",
@@ -116,7 +115,7 @@ if st.button("🚀 Render Monetization Short"):
                 audio_path = tmp_audio.name
             asyncio.run(generate_speech(script_input, selected_voice, audio_path))
 
-            status.write("🎬 Burning kinetic typography & branding...")
+            status.write("🎬 Burning clean captions & CTA branding...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
                 video_path = tmp_video.name
                 
