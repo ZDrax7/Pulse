@@ -1,0 +1,4 @@
+streamlit
+openai
+edge-tts
+moviepy==1.0.3
