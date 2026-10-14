@@ -1,9 +1,10 @@
 import os
 import asyncio
 import tempfile
-import subprocess
+import requests
 import streamlit as st
 import edge_tts
+import replicate
 
 # ==============================================================================
 # 1. STREAMLIT APP CONFIGURATION & BRANDING
@@ -48,10 +49,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='main-title'>⚡ FINTECH PULSE</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-title'>Free Automated High-RPM Short Video Engine</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>AI Visual Viral Short Video Generator</p>", unsafe_allow_html=True)
 
-# Sidebar Configuration
-st.sidebar.header("⚙️ Pipeline Setup")
+# Sidebar Configuration for AI Keys
+st.sidebar.header("⚙️ Cloud API Setup")
+replicate_api_key = st.sidebar.text_input("Replicate API Key (for AI Video Generation)", type="password")
 selected_voice = st.sidebar.selectbox(
     "Voice Actor",
     ["en-US-ChristopherNeural", "en-US-EricNeural", "en-US-JennyNeural"],
@@ -59,70 +61,80 @@ selected_voice = st.sidebar.selectbox(
 )
 
 # ==============================================================================
-# 2. HELPER FUNCTIONS: CRASH-PROOF FFMPEG RENDERING
+# 2. HELPER FUNCTIONS: AI VIDEO & AUDIO SYNTHESIS
 # ==============================================================================
 async def generate_speech(text: str, voice: str, output_file: str):
     """Generates audio file using Microsoft's Free Edge-TTS engine."""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def create_ffmpeg_video(audio_path: str, output_path: str):
-    """Renders 1080x1920 vertical background video with audio track safely."""
-    cmd = [
-        "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "color=c=0x0d1117:s=1080x1920:r=24",
-        "-i", audio_path,
-        "-shortest",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        output_path
-    ]
-    subprocess.run(cmd, check=True)
+def generate_ai_visual_video(topic: str, api_key: str) -> str:
+    """Calls an AI video model on Replicate to create a viral visual background video."""
+    os.environ["REPLICATE_API_TOKEN"] = api_key
+    
+    # Prompt optimized for high-retention viral aesthetic
+    prompt = f"Vertical 9:16 cinematic stock footage background visualizing: {topic}, futuristic tech aesthetic, glowing neon cyan lights, high-end wealth dashboard, 4k resolution, smooth motion."
+    
+    # Using a fast, high-quality video generation model via Replicate
+    output = replicate.run(
+        "minimax/video-01",
+        input={
+            "prompt": prompt,
+            "prompt_optimizer": True
+        }
+    )
+    
+    # Download the generated video file from the cloud URL
+    video_url = str(output)
+    response = requests.get(video_url)
+    
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    tmp_file.write(response.content)
+    tmp_file.close()
+    return tmp_file.name
 
 # ==============================================================================
 # 3. MAIN APPLICATION CONTROLLER
 # ==============================================================================
-script_input = st.text_area(
-    "💡 Enter or Paste Your Video Script:", 
-    "Stop scrolling if you want to automate your wealth in 2026. These three fintech tools manage your money on autopilot so you don't have to lift a finger. Link in bio to start."
+topic_input = st.text_input(
+    "💡 Enter Video Topic / Concept:", 
+    "Top 3 AI financial tracking tools automating wealth in 2026"
 )
 
-if st.button("🚀 Render Short Video"):
-    if not script_input.strip():
-        st.error("Please enter a script to render.")
+if st.button("🚀 Generate AI Visual Short"):
+    if not replicate_api_key:
+        st.error("Please provide your Replicate API key in the sidebar to generate AI visuals.")
+    elif not topic_input.strip():
+        st.error("Please enter a video topic.")
     else:
-        status = st.status("⚡ Generating Video Pipeline...", expanded=True)
+        status = st.status("⚡ Generating AI Visual Video...", expanded=True)
         
         try:
-            status.write("🎙️ Synthesizing voiceover track...")
+            # Step 1: Generate AI Visual Background
+            status.write("🧠 AI is visualizing and rendering cinematic background scenes...")
+            ai_video_path = generate_ai_visual_video(topic_input, replicate_api_key)
+
+            # Step 2: Generate Voiceover
+            status.write("🎙️ Synthesizing high-retention voiceover track...")
+            script_text = f"Stop scrolling. Here is everything you need to know about {topic_input}. Link in bio to start."
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
                 audio_path = tmp_audio.name
             
-            asyncio.run(generate_speech(script_input, selected_voice, audio_path))
-
-            status.write("🎬 Compiling 1080x1920 vertical video package...")
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
-                video_path = tmp_video.name
-                
-            create_ffmpeg_video(audio_path, video_path)
+            asyncio.run(generate_speech(script_text, selected_voice, audio_path))
             
-            status.update(label="✅ Video Package Ready!", state="complete")
+            status.update(label="✅ AI Viral Video Ready!", state="complete")
 
-            st.subheader("📜 Script Track:")
-            st.info(script_input)
-
-            st.subheader("📺 Video Preview")
-            st.video(video_path)
+            st.subheader("📺 AI Visual Preview")
+            st.video(ai_video_path)
             
-            with open(video_path, "rb") as file:
+            with open(ai_video_path, "rb") as file:
                 st.download_button(
-                    label="📥 Download Ready Short (.mp4)",
+                    label="📥 Download Viral AI Short (.mp4)",
                     data=file,
-                    file_name="fintech_pulse_short.mp4",
+                    file_name="fintech_pulse_viral_ai.mp4",
                     mime="video/mp4"
                 )
 
         except Exception as e:
-            status.update(label="❌ Error generating video", state="error")
+            status.update(label="❌ Error generating AI video", state="error")
             st.error(f"Error details: {e}")
